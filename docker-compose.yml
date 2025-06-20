@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  pizza-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data  # Mount local data directory
+    environment:
+      DISPLAY: ${DISPLAY}  # For GUI apps, enables display redirection
+    network_mode: "host"    # Necessary for GUI apps to use the host's display
