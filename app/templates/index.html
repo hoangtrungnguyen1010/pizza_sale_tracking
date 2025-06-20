@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pizza Tracker</title>
+    <title>Pizza Staff Oven Tracking</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
         .spinner-overlay {
             position: fixed;
@@ -67,6 +68,30 @@
             100% { width: 100%; }
         }
         
+        .oven-area-info {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid #ff4757;
+        }
+        
+        .instruction-steps {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .instruction-steps ol {
+            margin-bottom: 0;
+        }
+        
+        .instruction-steps li {
+            margin-bottom: 0.5rem;
+        }
+        
         #videoWrapper {
             position: relative;
             display: inline-block;
@@ -100,27 +125,46 @@
             <div class="col-lg-8">
                 <div class="card shadow">
                     <div class="card-body">
-                        <h1 class="card-title text-center mb-4">🍕 Pizza Tracker</h1>
-                        <p class="text-center text-muted mb-4">Upload a video, draw a rectangle over the area you want to process, and click <b>Start Processing</b>.</p>
+                        <h1 class="card-title text-center mb-4">🔥 Pizza Staff Oven Tracking</h1>
+                        
+                        <div class="oven-area-info">
+                            <h5 class="mb-2">🎯 Oven Area Definition</h5>
+                            <p class="mb-0">Draw a rectangle around the oven area to track when staff members visit the oven. This helps monitor pizza baking and staff workflow.</p>
+                        </div>
+                        
+                        <div class="instruction-steps">
+                            <h6 class="mb-2">📋 Instructions:</h6>
+                            <ol>
+                                <li><strong>Upload Video:</strong> Select a video file showing the kitchen area with the oven</li>
+                                <li><strong>Define Oven Area:</strong> Draw a rectangle around the oven area by clicking and dragging</li>
+                                <li><strong>Start Tracking:</strong> Click "Start Processing" to analyze staff visits to the oven</li>
+                                <li><strong>Review Results:</strong> View the processed video with staff tracking overlay</li>
+                            </ol>
+                        </div>
+                        
                         <form id="uploadForm" method="POST" enctype="multipart/form-data" class="mb-3 text-center">
                             <label for="uploadBtn" class="form-label">Select a video file (MP4):</label>
                             <input type="file" id="uploadBtn" accept="video/mp4" name="video" class="form-control d-inline-block w-auto" style="max-width:300px;">
                         </form>
+                        
                         <div class="mb-3 text-center">
-                            <small class="text-muted">Tip: Draw a rectangle by clicking and dragging on the video.</small>
+                            <small class="text-muted">💡 Tip: Draw the rectangle to cover the entire oven area where staff typically interact</small>
                         </div>
+                        
                         <div id="videoWrapper" class="mb-4 mx-auto text-center">
                             <video id="video" controls></video>
                             <canvas id="canvas"></canvas>
                         </div>
+                        
                         <div class="d-flex justify-content-center">
-                            <button id="processBtn" class="btn btn-primary px-4" disabled data-bs-toggle="tooltip" data-bs-placement="top" title="Draw a rectangle and upload a video first">Start Processing</button>
+                            <button id="processBtn" class="btn btn-primary px-4" disabled data-bs-toggle="tooltip" data-bs-placement="top" title="Draw an oven area rectangle and upload a video first">Start Oven Tracking</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
     <div class="spinner-overlay" id="spinnerOverlay">
         <div class="spinner-content">
             <div class="spinner-text">Processing...</div>
@@ -133,235 +177,6 @@
     
     <!-- Bootstrap JS (for tooltips) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-    // Video and canvas overlay logic for drawing rectangle on uploaded video
-    window.addEventListener('DOMContentLoaded', function() {
-        const uploadBtn = document.getElementById('uploadBtn');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let isDrawing = false;
-        let rect = {};
-        let hasRect = false;
-        let videoLoaded = false;
-
-        // Video error handling print error message
-        video.addEventListener('error', function(e) {
-            let error = video.error;
-            let message = 'Error: Unable to load the video.';
-            if (error) {
-                switch (error.code) {
-                    case error.MEDIA_ERR_ABORTED:
-                        message += ' You aborted the video playback.';
-                        break;
-                    case error.MEDIA_ERR_NETWORK:
-                        message += ' A network error caused the video download to fail.';
-                        break;
-                    case error.MEDIA_ERR_DECODE:
-                        message += ' The video playback was aborted due to a corruption problem or because the video used features your browser did not support.';
-                        break;
-                    case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                        message += ' The video could not be loaded, either because the server or network failed or because the format is not supported.';
-                        break;
-                    default:
-                        message += ' An unknown error occurred.';
-                        break;
-                }
-                message += ` (Error code: ${error.code})`;
-            }
-            alert(message);
-            console.error('Video error:', error);
-        });
-
-        // Sync canvas size with video dimensions
-        video.addEventListener('loadedmetadata', () => {
-            // Set canvas dimensions to match video's natural dimensions
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            videoLoaded = true;
-            clearRectAndButton();
-            drawOverlay();
-            console.log('Video metadata loaded, canvas synced.', {
-                videoWidth: video.videoWidth,
-                videoHeight: video.videoHeight,
-                canvasWidth: canvas.width,
-                canvasHeight: canvas.height
-            });
-        });
-
-        // Always draw overlay (rectangle) on top of video
-        function drawOverlay() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (hasRect && rect.width && rect.height) {
-                ctx.strokeStyle = 'red';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
-            }
-        }
-
-        // Redraw overlay on every frame (if video is playing)
-        video.addEventListener('play', () => {
-            function drawFrame() {
-                if (!video.paused && !video.ended) {
-                    drawOverlay();
-                    requestAnimationFrame(drawFrame);
-                }
-            }
-            drawFrame();
-        });
-
-        // Also redraw overlay when video is paused or seeked
-        video.addEventListener('pause', drawOverlay);
-        video.addEventListener('seeked', drawOverlay);
-
-        // Helper function to get correct mouse coordinates
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            
-            return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
-            };
-        }
-
-        // Rectangle drawing logic
-        canvas.addEventListener('mousedown', (e) => {
-            if (!videoLoaded) {
-                console.log('mousedown: video not loaded');
-                return;
-            }
-            
-            e.preventDefault();
-            isDrawing = true;
-            hasRect = false;
-            
-            const pos = getMousePos(e);
-            rect.startX = pos.x;
-            rect.startY = pos.y;
-            rect.width = 0;
-            rect.height = 0;
-            
-            canvas.classList.add('drawing');
-            
-            console.log('mousedown:', {
-                clientX: e.clientX,
-                clientY: e.clientY,
-                startX: rect.startX,
-                startY: rect.startY,
-                isDrawing
-            });
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing) {
-                return;
-            }
-            
-            e.preventDefault();
-            const pos = getMousePos(e);
-            
-            rect.width = pos.x - rect.startX;
-            rect.height = pos.y - rect.startY;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = 'rgba(255,0,0,0.8)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([8, 4]);
-            ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
-            ctx.setLineDash([]);
-            
-            console.log('mousemove:', {
-                clientX: e.clientX,
-                clientY: e.clientY,
-                x: pos.x,
-                y: pos.y,
-                width: rect.width,
-                height: rect.height
-            });
-        });
-
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDrawing) {
-                console.log('mouseup: not drawing');
-                return;
-            }
-            
-            e.preventDefault();
-            isDrawing = false;
-            hasRect = Math.abs(rect.width) > 10 && Math.abs(rect.height) > 10;
-            
-            canvas.classList.remove('drawing');
-            drawOverlay();
-            clearRectAndButton();
-            
-            console.log('mouseup:', {
-                clientX: e.clientX,
-                clientY: e.clientY,
-                hasRect,
-                rect
-            });
-        });
-
-        // Prevent context menu on right click
-        canvas.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-
-        function clearRectAndButton() {
-            // Enable process button only if video loaded and rectangle drawn
-            const btn = document.getElementById('processBtn');
-            if (videoLoaded && hasRect) {
-                btn.disabled = false;
-                btn.setAttribute('title', '');
-            } else {
-                btn.disabled = true;
-                btn.setAttribute('title', 'Draw a rectangle and upload a video first');
-            }
-        }
-
-        // Handle file upload and video load
-        uploadBtn.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            // Accept if file.type is video/mp4 or file name ends with .mp4 (case-insensitive)
-            const isMp4 = file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp4');
-            if (!isMp4) {
-                alert('Please select a valid MP4 video file.');
-                console.error('Invalid file type:', file.type, file.name);
-                return;
-            }
-            
-            const videoURL = URL.createObjectURL(file);
-            video.src = videoURL;
-            video.load();
-            
-            // Reset drawing state
-            hasRect = false;
-            rect = {};
-            videoLoaded = false;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            clearRectAndButton();
-            
-            console.log('Video file uploaded and src set.');
-        });
-
-        // Process button click handler
-        document.getElementById('processBtn').addEventListener('click', function() {
-            if (!hasRect || !videoLoaded) {
-                alert('Please upload a video and draw a rectangle first.');
-                return;
-            }
-            
-            console.log('Processing with rectangle:', rect);
-            // Add your processing logic here
-            alert('Processing would start here with rectangle: ' + JSON.stringify(rect));
-        });
-    });
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

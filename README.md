@@ -1,13 +1,102 @@
 # Project: Pixxa Count
 
 ## Overview
-Pixxa Count is a video processing tool designed to track and analyze pizza sales using computer vision. The application allows users to interact with video frames, select objects of interest, and process videos to extract useful insights.
+Pixxa Count is an advanced computer vision application designed to count pizza sales by tracking customer interactions and transactions. The system uses Region of Interest (ROI) detection, enhanced people tracking, and sophisticated video processing to provide insights into sales patterns and customer behavior at pizza establishments.
 
 ## Features
-- Drag-and-drop functionality to select bounding boxes on videos.
-- Real-time video display with interactive overlays.
-- Backend processing to analyze selected regions in videos.
-- Outputs processed videos for review.
+
+### 🔍 **Region of Interest (ROI) Detection**
+- **Interactive ROI Selection**: Users can draw a rectangle around the sales/counter area to define the Region of Interest
+- **Precise Area Definition**: The system tracks customer interactions specifically within the defined sales area
+- **Real-time Visualization**: The ROI is highlighted in red-orange color with "SALES AREA" label
+- **Customizable Boundaries**: Adjustable ROI size and position for different store layouts
+
+### 👥 **Enhanced People Detection**
+- **YOLO-based Detection**: Uses Ultralytics YOLO models for accurate customer detection
+- **ROI Cropping**: Automatically crops the region that includes people for better detection accuracy
+- **Multi-person Tracking**: Simultaneously tracks multiple customers
+- **Confidence Filtering**: Filters detections based on confidence thresholds for reliability
+
+### 🌟 **Low Light Enhancement**
+- **CLAHE Algorithm**: Implements Contrast Limited Adaptive Histogram Equalization
+- **LAB Color Space Processing**: Converts to LAB color space for better light enhancement
+- **Automatic Enhancement**: Applies enhancement to all frames for consistent visibility
+- **Performance Optimized**: Efficient processing without significant performance impact
+
+### 🔄 **Occlusion Handling**
+- **Object Persistence**: Maintains object identity even when temporarily occluded
+- **Disappearance Tracking**: Tracks how long objects remain undetected
+- **Reappearance Detection**: Automatically re-identifies objects when they reappear
+- **Historical Data**: Uses object history for better tracking during occlusions
+- **Pixel Similarity Matching**: Compares object appearances for re-identification
+
+### 📊 **Sales Analytics**
+- **Customer Visit Counting**: Tracks unique customer visits to the sales area
+- **Transaction Analysis**: Measures time spent in the sales area (potential transactions)
+- **Sales Pattern Insights**: Provides data on peak hours and customer flow
+- **Real-time Statistics**: Displays live tracking statistics on video overlay
+
+## System Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Video Input   │───▶│  ROI Selection  │───▶│ People Detection│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Low Light      │◀───│  Video          │◀───│ Object Tracking │
+│ Enhancement     │    │ Processing      │    │ & Occlusion     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Analytics &     │◀───│ Sales Area      │◀───│ Visit Detection │
+│ Reporting       │    │ Interaction     │    │ & Counting      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+![System Architecture](image/diagram.png)
+
+## Technical Implementation
+
+### ROI Processing Pipeline
+1. **User Input**: Interactive rectangle drawing on video
+2. **Area Definition**: Coordinates stored for processing
+3. **Crop Generation**: Automatic cropping of ROI for detection
+4. **Detection Focus**: People detection focused within ROI
+5. **Interaction Analysis**: Customer-sales area interaction tracking
+
+### People Detection Enhancement
+```python
+def detect_customers(model, frame, roi_area=None):
+    """
+    Enhanced customer detection with ROI cropping
+    - Crops frame to ROI for better detection
+    - Applies confidence filtering
+    - Returns bounding boxes with customer IDs
+    """
+```
+
+### Low Light Enhancement
+```python
+def enhance_low_light(frame):
+    """
+    CLAHE-based low light enhancement
+    - Converts to LAB color space
+    - Applies CLAHE to L channel
+    - Maintains color accuracy
+    """
+```
+
+### Occlusion Handling
+```python
+def handle_occlusion(tracked_object, current_frame):
+    """
+    Advanced occlusion handling
+    - Tracks disappearance duration
+    - Uses pixel similarity for re-identification
+    - Maintains object history
+    """
+```
 
 ## Project Structure
 ```
@@ -17,32 +106,42 @@ pixxa_count/
 │   │   ├── css/                 # Styling
 │   │   ├── js/                  # JavaScript for interactivity
 │   └── templates/               # HTML templates
-│       └── index.html           # Main UI
+│       └── index.html           # Main UI with ROI selection
+├── app/helper/                  # Core tracking logic
+│   ├── TrackerConfig.py         # Configuration parameters
+│   ├── trackedObject.py         # Object tracking data classes
+│   ├── pizzaTracker.py          # Main tracking algorithms
+│   └── __init__.py              # Package initialization
 ├── data/                        # Uploaded and processed videos
-│   ├── sample_video.mp4         # Example video
-│   ├── output/                  # Directory for processed videos
-├── app/video_processing.py      # Python logic for video detection
-├── app/server.py                # Flask backend
+│   ├── uploads/                 # User uploaded videos
+│   ├── output/                  # Processed videos with tracking
+│   └── sample_video.mp4         # Example video
+├── image/                       # Documentation images
+│   └── diagram.png              # System architecture diagram
+├── app/video_processing.py      # Video processing with ROI
+├── app/server.py                # Flask backend with ROI handling
 ├── Dockerfile                   # Docker setup
 ├── docker-compose.yml           # Compose services
 ├── requirements.txt             # Python dependencies
-└── README.md                    # Instructions
+└── README.md                    # This file
 ```
-
-##![Diagram](images/diagram.png)
 
 ## Requirements
 - Python 3.10+
 - Docker & Docker Compose
 - Flask
 - OpenCV
+- Ultralytics YOLO
+- NumPy
+- SciPy
+- Scikit-image
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/pixxa_count.git
-   cd pixxa_count
+   git clone https://github.com/hoangtrungnguyen1010/pizza_sale_tracking.git
+   cd pizza_sale_tracking
    ```
 
 2. Build the Docker container:
@@ -61,53 +160,105 @@ pixxa_count/
    ```
 
 ## Usage
-1. Upload a video file to the `data/` directory (e.g., `sample_video.mp4`).
-2. Open the web interface at `http://localhost:5000`.
-3. Play the video and drag a rectangle over the region of interest.
-4. Click "Start Processing" to analyze the selected region.
-5. View the processed video in the "Processed Video" section.
+
+### 1. **Upload Video**
+   - Select a video file showing the sales/counter area
+   - Supported format: MP4
+   - Video should clearly show customer interactions at the counter
+
+### 2. **Define ROI (Sales Area)**
+   - Draw a rectangle around the sales/counter area by clicking and dragging
+   - The ROI defines the area where customer visits will be tracked
+   - Ensure the rectangle covers the entire sales interaction area
+
+### 3. **Start Tracking**
+   - Click "Start Sales Tracking" to begin analysis
+   - The system will process the video with ROI-based detection
+   - Real-time tracking overlay shows customer movements
+
+### 4. **Review Results**
+   - View the processed video with tracking overlay
+   - Red rectangle: Sales area (ROI)
+   - Blue rectangles: Customers
+   - Green rectangles: Customers currently in sales area
+   - Statistics: Total customer visits to sales area
 
 ## API Endpoints
 
-### `/start-processing`
+### `/upload`
 - **Method**: POST
-- **Description**: Processes the video based on user-selected bounding box coordinates.
+- **Description**: Upload video file for processing
+- **Payload**: Multipart form data with video file
+- **Response**: Success status and filename
+
+### `/process`
+- **Method**: POST
+- **Description**: Process video with ROI-based customer tracking
 - **Payload**:
   ```json
   {
       "startX": 100,
       "startY": 50,
-      "endX": 200,
-      "endY": 150
+      "width": 200,
+      "height": 150,
+      "filename": "video.mp4",
+      "salesArea": true
   }
   ```
 - **Response**:
   ```json
   {
-      "status": "success",
-      "outputVideoPath": "/static/output/processed_video.mp4"
+      "success": true,
+      "output_video": "/output/sales_tracking_video.mp4",
+      "message": "Sales area tracking completed! Found 15 customer visits to the sales area.",
+      "customer_visits": 15,
+      "sales_area": [100, 50, 300, 200]
   }
   ```
 
-### `/static/<filename>`
+### `/output/<filename>`
 - **Method**: GET
-- **Description**: Serves static files such as videos and processed outputs.
+- **Description**: Download processed videos
 
-## Notes
-- Ensure Docker is running before starting the application.
-- The processed video will be saved in the `data/output/` directory.
+## Key Features Explained
+
+### ROI-Based Detection
+The system uses Region of Interest (ROI) to focus detection efforts on the most important area - the sales counter. This improves:
+- **Detection Accuracy**: Better people detection within the ROI
+- **Processing Speed**: Reduced computational load
+- **Relevance**: Focus on meaningful sales interactions
+
+### Low Light Enhancement
+Store environments often have challenging lighting conditions. The system addresses this with:
+- **CLAHE Algorithm**: Adaptive histogram equalization
+- **Color Space Processing**: LAB color space for better enhancement
+- **Automatic Application**: Applied to all frames consistently
+
+### Occlusion Handling
+Customers often move behind equipment or each other. The system handles this with:
+- **Object Persistence**: Maintains identity during temporary occlusion
+- **Pixel Similarity**: Re-identification using appearance matching
+- **Historical Tracking**: Uses movement patterns for prediction
 
 ## Troubleshooting
-- **TclError: Couldn't connect to display**:
-  - Ensure you are running the application in a headless environment using Xvfb.
-  - Update the Dockerfile to include:
-    ```bash
-    CMD xvfb-run python main.py
-    ```
 
-- **Bounding Box Not Working**:
-  - Check the browser console for errors.
-  - Ensure the JavaScript logic in `index.html` is correct.
+### **Detection Issues**
+- Ensure good lighting in the video
+- Make sure the ROI covers the entire sales area
+- Check that customers are clearly visible
+
+### **Performance Issues**
+- Reduce video resolution if processing is slow
+- Ensure sufficient system resources
+- Check Docker container resource limits
+
+### **Tracking Accuracy**
+- Adjust ROI size for better coverage
+- Ensure consistent lighting conditions
+- Use higher quality video input
 
 ## License
 MIT License
+
+## Contributing
+Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.

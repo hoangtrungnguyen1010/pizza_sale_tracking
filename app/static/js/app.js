@@ -1,4 +1,4 @@
-// Video and canvas overlay logic for drawing rectangle on uploaded video
+// Video and canvas overlay logic for drawing oven area rectangle
 window.addEventListener('DOMContentLoaded', function() {
     const uploadBtn = document.getElementById('uploadBtn');
     const video = document.getElementById('video');
@@ -37,10 +37,6 @@ window.addEventListener('DOMContentLoaded', function() {
         alert(message);
         console.error('Video error:', error);
     });
-    video.addEventListener('error', function() {
-        alert('Error: Unable to load the video. Please make sure you selected a valid MP4 file.');
-        console.error('Video failed to load.');
-    });
 
     // Sync canvas size with video dimensions
     video.addEventListener('loadedmetadata', () => {
@@ -56,13 +52,19 @@ window.addEventListener('DOMContentLoaded', function() {
         console.log('Video metadata loaded, canvas synced.');
     });
 
-    // Always draw overlay (rectangle) on top of video
+    // Always draw overlay (oven area rectangle) on top of video
     function drawOverlay() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (hasRect && rect.width && rect.height) {
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
+            // Draw oven area with special styling
+            ctx.strokeStyle = '#ff6b6b'; // Red-orange color for oven area
+            ctx.lineWidth = 3;
             ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
+            
+            // Add oven area label
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('OVEN AREA', rect.startX, rect.startY - 10);
         }
     }
 
@@ -81,7 +83,7 @@ window.addEventListener('DOMContentLoaded', function() {
     video.addEventListener('pause', drawOverlay);
     video.addEventListener('seeked', drawOverlay);
 
-    // Rectangle drawing logic
+    // Rectangle drawing logic for oven area
     canvas.addEventListener('mousedown', (e) => {
         if (!videoLoaded) {
             console.log('mousedown: video not loaded');
@@ -96,13 +98,7 @@ window.addEventListener('DOMContentLoaded', function() {
         rect.height = 0;
         canvas.classList.add('drawing');
         canvas.style.pointerEvents = 'auto';
-        console.log('mousedown:', {
-            x: e.clientX,
-            y: e.clientY,
-            startX: rect.startX,
-            startY: rect.startY,
-            isDrawing
-        });
+        console.log('Started drawing oven area rectangle.');
     });
 
     canvas.addEventListener('mousemove', (e) => {
@@ -116,20 +112,11 @@ window.addEventListener('DOMContentLoaded', function() {
         rect.width = currX - rect.startX;
         rect.height = currY - rect.startY;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'rgba(255,0,0,0.7)';
+        ctx.strokeStyle = 'rgba(255,107,107,0.8)'; // Red-orange with transparency
         ctx.lineWidth = 2;
         ctx.setLineDash([6]);
         ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
         ctx.setLineDash([]);
-        console.log('mousemove:', {
-            x: e.clientX,
-            y: e.clientY,
-            currX,
-            currY,
-            width: rect.width,
-            height: rect.height,
-            isDrawing
-        });
     });
 
     canvas.addEventListener('mouseup', (e) => {
@@ -143,23 +130,18 @@ window.addEventListener('DOMContentLoaded', function() {
         canvas.style.pointerEvents = 'none';
         drawOverlay();
         clearRectAndButton();
-        console.log('mouseup:', {
-            x: e.clientX,
-            y: e.clientY,
-            hasRect,
-            rect
-        });
+        console.log('Finished drawing oven area rectangle.');
     });
 
     function clearRectAndButton() {
-        // Enable process button only if video loaded and rectangle drawn
+        // Enable process button only if video loaded and oven area drawn
         const btn = document.getElementById('processBtn');
         if (videoLoaded && hasRect) {
             btn.disabled = false;
             btn.setAttribute('title', '');
         } else {
             btn.disabled = true;
-            btn.setAttribute('title', 'Draw a rectangle and upload a video first');
+            btn.setAttribute('title', 'Draw an oven area rectangle and upload a video first');
         }
     }
 
@@ -208,20 +190,20 @@ window.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle the processing button
+    // Handle the oven tracking processing button
     document.getElementById('processBtn').addEventListener('click', () => {
         if (!hasRect || !videoLoaded) {
-            alert('Please draw a rectangle on the video first.');
+            alert('Please draw an oven area rectangle on the video first.');
             return;
         }
 
-        // Show loading overlay with initial message
+        // Show loading overlay with oven tracking specific messages
         const spinnerOverlay = document.getElementById('spinnerOverlay');
         const spinnerText = spinnerOverlay.querySelector('.spinner-text');
         const spinnerSubtext = spinnerOverlay.querySelector('.spinner-subtext');
         
-        spinnerText.textContent = 'Processing Video...';
-        spinnerSubtext.textContent = 'Drawing rectangle on each frame...';
+        spinnerText.textContent = 'Processing Oven Tracking...';
+        spinnerSubtext.textContent = 'Analyzing staff visits to the oven area...';
         spinnerOverlay.style.display = 'flex';
         
         const processData = {
@@ -229,12 +211,13 @@ window.addEventListener('DOMContentLoaded', function() {
             startY: rect.startY,
             width: rect.width,
             height: rect.height,
-            filename: uploadedFilename
+            filename: uploadedFilename,
+            ovenArea: true // Flag to indicate this is oven area tracking
         };
 
         // Update message after a short delay to show progress
         setTimeout(() => {
-            spinnerSubtext.textContent = 'Applying effects to video frames...';
+            spinnerSubtext.textContent = 'Detecting staff movements and oven interactions...';
         }, 2000);
 
         fetch('/process', {
@@ -249,29 +232,29 @@ window.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then((data) => {
-            spinnerText.textContent = 'Processing Complete!';
-            spinnerSubtext.textContent = 'Video has been successfully processed.';
+            spinnerText.textContent = 'Oven Tracking Complete!';
+            spinnerSubtext.textContent = 'Staff visits to oven area have been analyzed.';
             
             // Hide spinner after showing success message
             setTimeout(() => {
                 spinnerOverlay.style.display = 'none';
                 if (data.success) {
-                    alert('Processing Complete! Output video: ' + data.output_video);
+                    alert('Oven tracking complete! Processed video: ' + data.output_video + '\n\nStaff visits to the oven area have been tracked and analyzed.');
                     // Optionally, you could open the processed video in a new window
                     // window.open(data.output_video, '_blank');
                 } else {
-                    alert('Processing failed: ' + data.error);
+                    alert('Oven tracking failed: ' + data.error);
                 }
             }, 1500);
         })
         .catch((error) => {
-            spinnerText.textContent = 'Processing Failed!';
-            spinnerSubtext.textContent = 'An error occurred during processing.';
+            spinnerText.textContent = 'Oven Tracking Failed!';
+            spinnerSubtext.textContent = 'An error occurred during oven area analysis.';
             
             setTimeout(() => {
                 spinnerOverlay.style.display = 'none';
-                console.error('Processing error:', error);
-                alert('An error occurred during processing. Please try again.');
+                console.error('Oven tracking error:', error);
+                alert('An error occurred during oven tracking. Please try again.');
             }, 2000);
         });
     });
