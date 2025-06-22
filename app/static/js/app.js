@@ -10,6 +10,23 @@ window.addEventListener('DOMContentLoaded', function() {
     let videoLoaded = false;
     let uploadedFilename = null; // Store the uploaded filename
 
+    // Debug function to check canvas state
+    function debugCanvas() {
+        console.log('Canvas debug info:');
+        console.log('- Canvas element:', canvas);
+        console.log('- Canvas context:', ctx);
+        console.log('- Canvas width:', canvas.width);
+        console.log('- Canvas height:', canvas.height);
+        console.log('- Canvas style width:', canvas.style.width);
+        console.log('- Canvas style height:', canvas.style.height);
+        console.log('- Canvas offset width:', canvas.offsetWidth);
+        console.log('- Canvas offset height:', canvas.offsetHeight);
+        console.log('- Canvas pointer-events:', getComputedStyle(canvas).pointerEvents);
+        console.log('- Video loaded:', videoLoaded);
+        console.log('- Is drawing:', isDrawing);
+        console.log('- Has rect:', hasRect);
+    }
+
     // Video error handling print error message
     video.addEventListener('error', function(e) {
         let error = video.error;
@@ -40,6 +57,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
     // Sync canvas size with video dimensions
     video.addEventListener('loadedmetadata', () => {
+        console.log('Video metadata loaded, syncing canvas...');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.style.width = '100%';
@@ -47,13 +65,24 @@ window.addEventListener('DOMContentLoaded', function() {
         video.style.width = '100%';
         video.style.height = '100%';
         videoLoaded = true;
+        
+        // Ensure canvas is ready for drawing
+        canvas.style.pointerEvents = 'auto';
+        canvas.classList.remove('drawing');
+        
         clearRectAndButton();
         drawOverlay();
+        debugCanvas();
         console.log('Video metadata loaded, canvas synced.');
     });
 
     // Always draw overlay (oven area rectangle) on top of video
     function drawOverlay() {
+        if (!ctx || canvas.width === 0 || canvas.height === 0) {
+            console.warn('Cannot draw overlay: canvas not ready');
+            return;
+        }
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (hasRect && rect.width && rect.height) {
             // Draw oven area with special styling
@@ -85,10 +114,16 @@ window.addEventListener('DOMContentLoaded', function() {
 
     // Rectangle drawing logic for oven area
     canvas.addEventListener('mousedown', (e) => {
+        console.log('Mouse down event triggered');
         if (!videoLoaded) {
             console.log('mousedown: video not loaded');
             return;
         }
+        if (!ctx) {
+            console.error('Canvas context not available');
+            return;
+        }
+        
         isDrawing = true;
         hasRect = false;
         const rectLeft = canvas.getBoundingClientRect();
@@ -98,19 +133,24 @@ window.addEventListener('DOMContentLoaded', function() {
         rect.height = 0;
         canvas.classList.add('drawing');
         canvas.style.pointerEvents = 'auto';
-        console.log('Started drawing oven area rectangle.');
+        console.log('Started drawing oven area rectangle at:', rect.startX, rect.startY);
     });
 
     canvas.addEventListener('mousemove', (e) => {
         if (!isDrawing) {
-            //console.log('mousemove: not drawing');
             return;
         }
+        if (!ctx) {
+            console.error('Canvas context not available during mousemove');
+            return;
+        }
+        
         const rectLeft = canvas.getBoundingClientRect();
         const currX = (e.clientX - rectLeft.left) * (canvas.width / canvas.offsetWidth);
         const currY = (e.clientY - rectLeft.top) * (canvas.height / canvas.offsetHeight);
         rect.width = currX - rect.startX;
         rect.height = currY - rect.startY;
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = 'rgba(255,107,107,0.8)'; // Red-orange with transparency
         ctx.lineWidth = 2;
@@ -120,6 +160,7 @@ window.addEventListener('DOMContentLoaded', function() {
     });
 
     canvas.addEventListener('mouseup', (e) => {
+        console.log('Mouse up event triggered');
         if (!isDrawing) {
             console.log('mouseup: not drawing');
             return;
@@ -127,10 +168,10 @@ window.addEventListener('DOMContentLoaded', function() {
         isDrawing = false;
         hasRect = Math.abs(rect.width) > 10 && Math.abs(rect.height) > 10;
         canvas.classList.remove('drawing');
-        canvas.style.pointerEvents = 'none';
+        canvas.style.pointerEvents = 'auto'; // Keep pointer events enabled
         drawOverlay();
         clearRectAndButton();
-        console.log('Finished drawing oven area rectangle.');
+        console.log('Finished drawing oven area rectangle. Has rect:', hasRect, 'Size:', rect.width, 'x', rect.height);
     });
 
     function clearRectAndButton() {
@@ -177,7 +218,9 @@ window.addEventListener('DOMContentLoaded', function() {
                 video.load();
                 hasRect = false;
                 rect = {};
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
                 clearRectAndButton();
                 console.log('Video file uploaded and src set.');
             } else {
@@ -258,4 +301,7 @@ window.addEventListener('DOMContentLoaded', function() {
             }, 2000);
         });
     });
+
+    // Add debug button for testing
+    console.log('Canvas drawing system initialized. Use debugCanvas() in console to check state.');
 });

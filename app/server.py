@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 from app.video_processing import process_video
-from app.helper import SimpleTracker, TrackerConfig
+from app.core.trackers import PizzaTracker, PersonTracker
+from app.config import config
 
 app = Flask(__name__)
 
@@ -31,10 +32,10 @@ def upload_file():
         return jsonify({'error': 'No video file provided'}), 400
     
     file = request.files['video']
-    if file.filename == '':
+    if file.filename == '' or file.filename is None:
         return jsonify({'error': 'No file selected'}), 400
     
-    if file and allowed_file(file.filename):
+    if file and file.filename and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
@@ -46,12 +47,22 @@ def upload_file():
 def process():
     try:
         data = request.get_json()
-        start_x = int(data['startX'])
-        start_y = int(data['startY'])
-        width = int(data['width'])
-        height = int(data['height'])
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Extract parameters with validation
+        try:
+            start_x = int(data['startX'])
+            start_y = int(data['startY'])
+            width = int(data['width'])
+            height = int(data['height'])
+        except (KeyError, ValueError) as e:
+            return jsonify({'error': f'Invalid rectangle parameters: {str(e)}'}), 400
+        
         filename = data.get('filename', 'sample_video.mp4')  # Default fallback
         is_oven_area = data.get('ovenArea', False)  # Check if this is oven area tracking
+
+        print(f"Processing request: filename={filename}, oven_area=({start_x}, {start_y}, {width}, {height})")
 
         # Use uploaded video or fallback to sample
         input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -59,16 +70,28 @@ def process():
             # Fallback to sample video if uploaded file doesn't exist
             input_path = os.path.join('data', 'sample_video.mp4')
             if not os.path.exists(input_path):
-                return jsonify({'error': 'No video file found'}), 404
+                return jsonify({'error': f'No video file found: {filename}'}), 404
 
         output_filename = f'oven_tracking_{filename}' if is_oven_area else f'processed_{filename}'
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
 
         # Create oven area bounding box for tracking
         oven_area = (start_x, start_y, start_x + width, start_y + height)
+        print(f"Oven area: {oven_area}")
 
         # Call process_video with oven area coordinates
-        total_staff_visits = process_video_with_oven_tracking(input_path, output_path, oven_area)
+        try:
+            # For testing, limit to first 100 frames to avoid timeout
+            # In production, you might want to process the full video
+            max_frames = 100  # Limit frames for testing
+            total_staff_visits = process_video_with_oven_tracking(input_path, output_path, oven_area, max_frames)
+            print(f"Processing completed. Staff visits: {total_staff_visits}")
+                
+        except Exception as e:
+            print(f"Error in video processing: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Video processing failed: {str(e)}'}), 500
 
         success_message = f"Oven area tracking completed! Found {total_staff_visits} staff visits to the oven."
         
@@ -81,11 +104,16 @@ def process():
         })
 
     except Exception as e:
+        print(f"Unexpected error in process endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Oven tracking failed: {str(e)}'}), 500
 
-def process_video_with_oven_tracking(input_path, output_path, oven_area):
+def process_video_with_oven_tracking(input_path, output_path, oven_area, max_frames=None):
     """Process video specifically for oven area staff tracking"""
     try:
+        print(f"Starting oven tracking: input={input_path}, output={output_path}, oven_area={oven_area}, max_frames={max_frames}")
+        
         # Import here to avoid circular imports
         from app.video_processing import process_video
         
@@ -95,13 +123,16 @@ def process_video_with_oven_tracking(input_path, output_path, oven_area):
         
         # For now, we'll use the existing process_video function
         # In a full implementation, you would modify it to specifically track oven visits
-        total_visits = process_video(input_path, output_path, oven_area)
+        total_visits = process_video(input_path, output_path, oven_area, max_frames)
         
+        print(f"Video processing completed. Total visits: {total_visits}")
         return total_visits if total_visits else 0
         
     except Exception as e:
         print(f"Error in oven tracking: {e}")
-        return 0
+        import traceback
+        traceback.print_exc()
+        raise e
 
 @app.route('/output/<filename>')
 def download_file(filename):

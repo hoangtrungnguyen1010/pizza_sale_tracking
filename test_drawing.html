@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #videoWrapper {
+            position: relative;
+            width: 100%;
+            max-width: 720px;
+            margin: 20px auto;
+            background: #222;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #e9ecef;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Canvas Drawing Test</h1>
+        <p>This page tests the canvas drawing functionality. Upload a video and try to draw a rectangle.</p>
+        
+        <div class="status" id="status">Ready to test drawing...</div>
+        
+        <input type="file" id="uploadBtn" accept="video/mp4" style="margin: 10px 0;">
+        
+        <div id="videoWrapper">
+            <video id="video" controls></video>
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="debug-info" id="debugInfo">
+            Debug information will appear here...
+        </div>
+        
+        <button id="debugBtn" onclick="debugCanvas()">Debug Canvas</button>
+        <button id="clearBtn" onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+
+    <script>
+        const uploadBtn = document.getElementById('uploadBtn');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const debugInfo = document.getElementById('debugInfo');
+        
+        let isDrawing = false;
+        let rect = {};
+        let hasRect = false;
+        let videoLoaded = false;
+
+        function updateStatus(message) {
+            status.textContent = message;
+            console.log(message);
+        }
+
+        function updateDebugInfo() {
+            const info = `
+Canvas Debug Info:
+- Canvas element: ${canvas ? 'Found' : 'Missing'}
+- Canvas context: ${ctx ? 'Available' : 'Missing'}
+- Canvas width: ${canvas.width}
+- Canvas height: ${canvas.height}
+- Canvas offset width: ${canvas.offsetWidth}
+- Canvas offset height: ${canvas.offsetHeight}
+- Canvas pointer-events: ${getComputedStyle(canvas).pointerEvents}
+- Video loaded: ${videoLoaded}
+- Is drawing: ${isDrawing}
+- Has rect: ${hasRect}
+- Rect: ${JSON.stringify(rect)}
+            `.trim();
+            debugInfo.textContent = info;
+        }
+
+        function debugCanvas() {
+            updateDebugInfo();
+            console.log('Canvas debug info updated');
+        }
+
+        function clearCanvas() {
+            if (ctx && canvas.width > 0 && canvas.height > 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                hasRect = false;
+                rect = {};
+                updateStatus('Canvas cleared');
+                updateDebugInfo();
+            }
+        }
+
+        // Video event handlers
+        video.addEventListener('loadedmetadata', () => {
+            updateStatus('Video metadata loaded, syncing canvas...');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            videoLoaded = true;
+            canvas.style.pointerEvents = 'auto';
+            updateStatus('Canvas ready for drawing');
+            updateDebugInfo();
+        });
+
+        video.addEventListener('error', (e) => {
+            updateStatus('Video error: ' + (video.error ? video.error.message : 'Unknown error'));
+        });
+
+        // File upload handler
+        uploadBtn.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.includes('video')) {
+                updateStatus('Please select a video file');
+                return;
+            }
+            
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            video.load();
+            hasRect = false;
+            rect = {};
+            updateStatus('Loading video...');
+        });
+
+        // Drawing event handlers
+        canvas.addEventListener('mousedown', (e) => {
+            updateStatus('Mouse down - starting to draw...');
+            if (!videoLoaded) {
+                updateStatus('Video not loaded yet');
+                return;
+            }
+            
+            isDrawing = true;
+            hasRect = false;
+            const rectLeft = canvas.getBoundingClientRect();
+            rect.startX = (e.clientX - rectLeft.left) * (canvas.width / canvas.offsetWidth);
+            rect.startY = (e.clientY - rectLeft.top) * (canvas.height / canvas.offsetHeight);
+            rect.width = 0;
+            rect.height = 0;
+            updateDebugInfo();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            
+            const rectLeft = canvas.getBoundingClientRect();
+            const currX = (e.clientX - rectLeft.left) * (canvas.width / canvas.offsetWidth);
+            const currY = (e.clientY - rectLeft.top) * (canvas.height / canvas.offsetHeight);
+            rect.width = currX - rect.startX;
+            rect.height = currY - rect.startY;
+            
+            // Draw the rectangle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6]);
+            ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
+            ctx.setLineDash([]);
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            updateStatus('Mouse up - finished drawing');
+            if (!isDrawing) return;
+            
+            isDrawing = false;
+            hasRect = Math.abs(rect.width) > 10 && Math.abs(rect.height) > 10;
+            
+            // Draw final rectangle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(rect.startX, rect.startY, rect.width, rect.height);
+            
+            if (hasRect) {
+                updateStatus(`Rectangle drawn successfully! Size: ${Math.abs(rect.width)} x ${Math.abs(rect.height)}`);
+            } else {
+                updateStatus('Rectangle too small, please draw a larger one');
+            }
+            updateDebugInfo();
+        });
+
+        // Initialize
+        updateStatus('Drawing test page loaded. Upload a video and try drawing!');
+        updateDebugInfo();
+    </script>
+</body>
+</html> 
